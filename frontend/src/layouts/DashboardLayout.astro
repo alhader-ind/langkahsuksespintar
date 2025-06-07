@@ -1,0 +1,58 @@
+---
+// src/layouts/DashboardLayout.astro
+import '../styles/global.css'; // Import global styles
+
+const { title = 'Affiliate Hub' } = Astro.props;
+---
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{title} - Langkah Sukses Pintar</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <style>
+    /* Layout-specific styles can go here if needed */
+    .logout-button {
+      background-color: #dc3545; /* Red color for logout */
+      color: white;
+      padding: 0.5rem 1rem;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 1rem;
+      text-decoration: none;
+    }
+    .logout-button:hover {
+      background-color: #c82333;
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <ul>
+      <li><a href="/">Langkah Sukses Pintar Hub</a></li>
+      <li><button id="logoutButton" class="logout-button">Logout</button></li>
+    </ul>
+  </nav>
+  <main class="container">
+    <slot /> <!-- Page content will be injected here -->
+  </main>
+  <footer>
+    <div class="container" style="text-align: center; margin-top: 2rem; font-size: 0.9em; color: #666;">
+      &copy; {new Date().getFullYear()} Langkah Sukses Pintar. All rights reserved.
+    </div>
+  </footer>
+
+  <script>
+    // src/layouts/DashboardLayout.astro <script>
+    const logoutButton = document.getElementById('logoutButton');
+    if (logoutButton) {
+      logoutButton.addEventListener('click', () => {
+        localStorage.removeItem('isLoggedIn');
+        localStorage.removeItem('sharedPassword'); // Also clear password if stored
+        window.location.href = '/login';
+      });
+    }
+  </script>
+</body>
+</html>

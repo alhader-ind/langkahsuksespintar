@@ -1,0 +1,334 @@
+---
+// src/pages/index.astro
+import DashboardLayout from '../layouts/DashboardLayout.astro';
+
+const pageTitle = "Dashboard";
+const currentYear = new Date().getFullYear();
+---
+<DashboardLayout title={pageTitle}>
+  <header>
+    <h1>Welcome to the Affiliate Dashboard!</h1>
+  </header>
+
+  <section id="linkCreationSection" class="dashboard-section">
+    <h2>Create New Affiliate Link</h2>
+    <form id="createLinkForm">
+      <div>
+        <label for="target_url">Target URL:</label>
+        <input type="url" id="target_url" name="target_url" placeholder="e.g., https://example.com/product" required />
+      </div>
+      <div>
+        <label for="affiliate_id">Affiliate ID (Optional):</label>
+        <input type="text" id="affiliate_id" name="affiliate_id" placeholder="e.g., mycampaign123" />
+      </div>
+      <button type="submit">Create Link</button>
+      <div id="createLinkMessage" class="message-area" style="display: none;"></div>
+    </form>
+  </section>
+
+  <section id="linksListSection" class="dashboard-section">
+    <h2>Your Affiliate Links</h2>
+    <div id="linksTableContainer">
+      <p>Loading links...</p>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Target URL</th>
+            <th>Affiliate Code</th>
+            <th>Full Link</th>
+            <th>Affiliate ID</th>
+            <th>Clicks (Today)</th>
+            <th>Total Conversions</th>
+            <!-- <th>Actions</th> -->
+          </tr>
+        </thead>
+        <tbody id="linksTableBody">
+          <!-- Link items will be rendered here -->
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="commissionSummarySection" class="dashboard-section">
+    <h2>Commission Summary</h2>
+    <div id="commissionSummaryContent">
+      <p>Calculating summary...</p>
+      <!-- Commission summary will be rendered here -->
+    </div>
+  </section>
+
+  <!-- Template for a single link row -->
+  <template id="linkItemTemplate">
+    <tr>
+      <td data-label="ID" class="link-id"></td>
+      <td data-label="Target URL" class="link-target-url"><a href="#" target="_blank"></a></td>
+      <td data-label="Affiliate Code" class="link-unique-code"><code></code></td>
+      <td data-label="Full Link" class="link-full-affiliate-link">
+        <input type="text" readonly />
+        <button class="copy-button">Copy</button>
+      </td>
+      <td data-label="Affiliate ID" class="link-affiliate-id"></td>
+      <td data-label="Clicks (Today)" class="link-clicks-today"></td>
+      <td data-label="Conversions" class="link-total-conversions"></td>
+      <!-- <td data-label="Actions"><button class="delete-button">Delete</button></td> -->
+    </tr>
+  </template>
+
+</DashboardLayout>
+
+<script>
+  // src/pages/index.astro <script>
+  document.addEventListener('DOMContentLoaded', () => {
+    // Authentication Check
+    if (localStorage.getItem('isLoggedIn') !== 'true') {
+      window.location.href = '/login';
+      return;
+    }
+
+    const linksTableBody = document.getElementById('linksTableBody');
+    const linkItemTemplate = document.getElementById('linkItemTemplate');
+    const createLinkForm = document.getElementById('createLinkForm');
+    const createLinkMessage = document.getElementById('createLinkMessage');
+    const commissionSummaryContent = document.getElementById('commissionSummaryContent');
+
+    // Function to fetch all links
+    async function fetchLinks() {
+      try {
+        const response = await fetch('/api/links');
+        if (!response.ok) {
+          throw new Error(`Failed to fetch links: ${response.statusText}`);
+        }
+        const links = await response.json();
+        renderLinks(links);
+        displayCommissionSummary(links);
+      } catch (error) {
+        console.error('Error fetching links:', error);
+        linksTableBody.innerHTML = `<tr><td colspan="7" class="error-message">Error loading links: ${error.message}</td></tr>`;
+      }
+    }
+
+    // Function to render the list of links
+    function renderLinks(links) {
+      linksTableBody.innerHTML = ''; // Clear existing rows
+      if (!links || links.length === 0) {
+        linksTableBody.innerHTML = '<tr><td colspan="7" style="text-align:center;">No links found. Create one above!</td></tr>';
+        return;
+      }
+      links.forEach(link => addLinkToTable(link));
+    }
+
+    // Function to add a single link to the table
+    function addLinkToTable(link) {
+      const templateContent = linkItemTemplate.content.cloneNode(true);
+      const row = templateContent.querySelector('tr');
+
+      const fullLink = `http://${window.location.host}/go?code=${link.unique_code}`;
+
+      row.querySelector('.link-id').textContent = link.id;
+      const targetUrlAnchor = row.querySelector('.link-target-url a');
+      targetUrlAnchor.href = link.target_url;
+      targetUrlAnchor.textContent = link.target_url.length > 50 ? link.target_url.substring(0, 47) + '...' : link.target_url;
+      targetUrlAnchor.title = link.target_url;
+      row.querySelector('.link-unique-code code').textContent = link.unique_code;
+
+      const fullLinkInput = row.querySelector('.link-full-affiliate-link input');
+      fullLinkInput.value = fullLink;
+      const copyButton = row.querySelector('.link-full-affiliate-link .copy-button');
+      copyButton.addEventListener('click', () => {
+        fullLinkInput.select();
+        document.execCommand('copy');
+        copyButton.textContent = 'Copied!';
+        setTimeout(() => { copyButton.textContent = 'Copy'; }, 2000);
+      });
+
+      row.querySelector('.link-affiliate-id').textContent = link.affiliate_id || 'N/A';
+      row.querySelector('.link-clicks-today').textContent = link.unique_clicks_today !== undefined ? link.unique_clicks_today : 'N/A';
+      row.querySelector('.link-total-conversions').textContent = link.total_conversions !== undefined ? link.total_conversions : 'N/A';
+
+      // const deleteButton = row.querySelector('.delete-button');
+      // deleteButton.addEventListener('click', () => handleDeleteLink(link.id, row));
+
+      linksTableBody.appendChild(row);
+    }
+
+    // Function to handle new link creation form submission
+    async function handleCreateLink(event) {
+      event.preventDefault();
+      createLinkMessage.style.display = 'none';
+      createLinkMessage.className = 'message-area'; // Reset class
+
+      const targetUrl = event.target.target_url.value;
+      const affiliateId = event.target.affiliate_id.value;
+
+      if (!targetUrl) {
+        createLinkMessage.textContent = 'Target URL is required.';
+        createLinkMessage.className = 'message-area error-message';
+        createLinkMessage.style.display = 'block';
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/links', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ target_url: targetUrl, affiliate_id: affiliateId || null }),
+        });
+        const result = await response.json();
+
+        if (response.ok && result.success && result.link) {
+          addLinkToTable(result.link); // Add new link to the table
+          createLinkMessage.textContent = `Link created successfully: ${result.link.full_affiliate_link}`;
+          createLinkMessage.className = 'message-area success-message'; // Add a success class
+          createLinkForm.reset(); // Clear form fields
+          fetchLinks(); // Re-fetch to update summaries, or update summary directly
+        } else {
+          createLinkMessage.textContent = result.message || 'Failed to create link.';
+          createLinkMessage.className = 'message-area error-message';
+        }
+      } catch (error) {
+        console.error('Error creating link:', error);
+        createLinkMessage.textContent = 'An error occurred while creating the link.';
+        createLinkMessage.className = 'message-area error-message';
+      }
+      createLinkMessage.style.display = 'block';
+    }
+
+    createLinkForm.addEventListener('submit', handleCreateLink);
+
+    // Function to calculate and display commission summary
+    function displayCommissionSummary(links) {
+      if (!links || links.length === 0) {
+        commissionSummaryContent.innerHTML = '<p>No affiliate data to summarize.</p>';
+        return;
+      }
+
+      const commissionSummary = {};
+      links.forEach(link => {
+        if (link.affiliate_id && link.total_conversions > 0) {
+          commissionSummary[link.affiliate_id] = (commissionSummary[link.affiliate_id] || 0) + link.total_conversions;
+        }
+      });
+
+      if (Object.keys(commissionSummary).length === 0) {
+        commissionSummaryContent.innerHTML = '<p>No conversions recorded yet for any affiliate ID.</p>';
+        return;
+      }
+
+      let summaryHtml = '<ul>';
+      for (const [affId, totalConversions] of Object.entries(commissionSummary)) {
+        // Assuming a simple $1 per conversion for display purposes
+        summaryHtml += `<li>Affiliate ID <strong>${affId}</strong>: ${totalConversions} conversions (e.g., $${totalConversions}.00 potential commission)</li>`;
+      }
+      summaryHtml += '</ul>';
+      commissionSummaryContent.innerHTML = summaryHtml;
+    }
+
+    // Initial load
+    const linksTableContainer = document.getElementById('linksTableContainer');
+    if(linksTableContainer) linksTableContainer.querySelector('p').textContent = 'Loading links...';
+    fetchLinks();
+  });
+</script>
+
+<style is:global>
+  /* Styles for tables and dashboard sections */
+  .dashboard-section {
+    background-color: #fff;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  }
+  .dashboard-section h2 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 0.5rem;
+  }
+
+  #createLinkForm div {
+    margin-bottom: 1rem;
+  }
+  #createLinkForm label {
+    display: block;
+    margin-bottom: 0.3rem;
+    font-weight: bold;
+  }
+
+  .message-area {
+    padding: 10px;
+    margin-top: 10px;
+    border-radius: 4px;
+    text-align: center;
+  }
+  .error-message { /* Already in global.css, but can be more specific */
+    color: #721c24;
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+  }
+  .success-message {
+    color: #155724;
+    background-color: #d4edda;
+    border: 1px solid #c3e6cb;
+  }
+
+  #linksTableContainer table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+  }
+
+  #linksTableContainer th, #linksTableContainer td {
+    border: 1px solid #ddd;
+    padding: 10px 12px; /* Adjusted padding */
+    text-align: left;
+    font-size: 0.95rem; /* Slightly smaller font for table */
+  }
+
+  #linksTableContainer th {
+    background-color: #f0f2f5; /* Lighter header for a softer look */
+    font-weight: 600; /* Semibold */
+  }
+
+  #linksTableContainer tr:nth-child(even) {
+    background-color: #fdfdfd;
+  }
+
+  #linksTableContainer tr:hover {
+    background-color: #f1f1f1;
+  }
+
+  #linksTableContainer td .copy-button {
+    padding: 5px 8px; /* Smaller button */
+    font-size: 0.85em;
+    margin-left: 5px;
+  }
+  #linksTableContainer td input[type="text"] {
+    padding: 5px;
+    font-size: 0.9em;
+    width: calc(100% - 70px); /* Adjust based on button */
+    min-width: 150px; /* Prevent too small input */
+  }
+
+  /* Responsive table styles from previous step are kept if global.css is used properly */
+  @media screen and (max-width: 768px) {
+    #linksTableContainer thead { display: none; }
+    #linksTableContainer tr { display: block; margin-bottom: 1rem; border: 1px solid #ddd; border-radius: 4px; overflow: hidden; }
+    #linksTableContainer td { display: block; text-align: right; padding-left: 50%; position: relative; border: none; border-bottom: 1px dotted #eee; }
+    #linksTableContainer td::before { content: attr(data-label); position: absolute; left: 10px; width: calc(50% - 20px); padding-right: 10px; font-weight: bold; text-align: left;}
+    #linksTableContainer td input[type="text"] { width: calc(100% - 60px); } /* Ensure copy button fits */
+  }
+
+  #commissionSummaryContent ul {
+    list-style-type: none;
+    padding-left: 0;
+  }
+  #commissionSummaryContent li {
+    padding: 0.5rem 0;
+    border-bottom: 1px dotted #eee;
+  }
+  #commissionSummaryContent li:last-child {
+    border-bottom: none;
+  }
+</style>

@@ -1,0 +1,19 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "Backend services for affiliate link tracker",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "setup-db": "node setup_database.js",
+    "test-auth": "node auth.js",
+    "generate-link": "node link_generator.js"
+  },
+  "keywords": ["affiliate", "tracker", "nodejs"],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "sqlite3": "^5.1.7"
+  }
+}

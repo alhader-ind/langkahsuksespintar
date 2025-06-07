@@ -1,0 +1,144 @@
+---
+// src/pages/login.astro
+import '../styles/global.css'; // Import global styles if not already in a layout
+
+// This page should not use DashboardLayout as it's for unauthenticated users
+const pageTitle = "Login - Affiliate Hub";
+---
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{pageTitle}</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <style is:global>
+    /* Specific styles for login page if needed, or use global.css */
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      background-color: #f0f2f5; /* Slightly different bg for login */
+    }
+    .login-container {
+      background-color: #fff;
+      padding: 2rem 3rem;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+    }
+    .login-container h1 {
+      margin-bottom: 1.5rem;
+      color: #333;
+    }
+    .login-container form label {
+      display: block;
+      text-align: left;
+      margin-bottom: 0.5rem;
+      font-weight: bold;
+    }
+    .login-container input[type="password"] {
+      width: 100%;
+      padding: 0.75rem;
+      margin-bottom: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 1rem;
+    }
+    .login-container button {
+      width: 100%;
+      padding: 0.75rem;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+    .login-container button:hover {
+      background-color: #0056b3;
+    }
+    #errorMessage {
+      margin-top: 1rem;
+      /* Uses .error-message class from global.css if exists */
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <h1>Affiliate Hub Login</h1>
+    <form id="loginForm">
+      <div>
+        <label for="password">Password:</label>
+        <input type="password" id="password" name="password" required>
+      </div>
+      <button type="submit">Login</button>
+    </form>
+    <div id="errorMessage" class="error-message" style="display: none;"></div>
+  </div>
+
+  <script>
+    // src/pages/login.astro <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // Redirect if already logged in
+      if (localStorage.getItem('isLoggedIn') === 'true') {
+        window.location.href = '/'; // Redirect to dashboard
+        return; // Stop further execution
+      }
+
+      const loginForm = document.getElementById('loginForm');
+      const errorMessageDiv = document.getElementById('errorMessage');
+
+      if (loginForm) {
+        loginForm.addEventListener('submit', async (event) => {
+          event.preventDefault();
+          errorMessageDiv.style.display = 'none';
+          errorMessageDiv.textContent = '';
+
+          const passwordInput = document.getElementById('password');
+          const password = passwordInput.value;
+
+          if (!password) {
+            errorMessageDiv.textContent = 'Password cannot be empty.';
+            errorMessageDiv.style.display = 'block';
+            return;
+          }
+
+          try {
+            // IMPORTANT: Replace with actual backend URL if different
+            const response = await fetch('/api/login', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ password: password }),
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+              localStorage.setItem('isLoggedIn', 'true');
+              // Optionally, store the password if needed by other parts of the app,
+              // though this is generally not recommended for real passwords.
+              // For this specific app's "shared password" model, it might be okay
+              // if the dashboard needs to re-send it for some protected actions later.
+              // localStorage.setItem('sharedPassword', password);
+              window.location.href = '/'; // Redirect to dashboard
+            } else {
+              errorMessageDiv.textContent = result.message || 'Login failed. Please try again.';
+              errorMessageDiv.style.display = 'block';
+            }
+          } catch (error) {
+            console.error('Login API call failed:', error);
+            errorMessageDiv.textContent = 'An error occurred during login. Check console.';
+            errorMessageDiv.style.display = 'block';
+          }
+        });
+      }
+    });
+  </script>
+</body>
+</html>
